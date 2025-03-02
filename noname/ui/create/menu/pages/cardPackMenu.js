@@ -82,7 +82,7 @@ export const cardPackMenu = function (connectMenu) {
 						if (!game.hasExtension(extName) || !game.hasExtensionLoaded(extName)) continue;
 						if (lib.config[`extension_${extName}_cards_enable`] == true) {
 							node.classList.remove("off");
-							if (node.link) node.link.firstChild.classList.add("on");
+							node.link?.firstChild?.classList.add('on');
 						} else {
 							node.classList.add("off");
 							if (node.link) node.link.firstChild.classList.remove("on");
@@ -174,8 +174,7 @@ export const cardPackMenu = function (connectMenu) {
 			node.link = page;
 			var list = [];
 			for (var i = 0; i < info.length; i++) {
-				if (!lib.card[info[i]] || (lib.card[info[i]].derivation && mode != "mode_derivation"))
-					continue;
+				if (!lib.card[info[i]]) continue;
 				list.push([get.translation(get.type(info[i], "trick")), "", info[i]]);
 			}
 			var sortCard = function (card) {
@@ -445,7 +444,12 @@ export const cardPackMenu = function (connectMenu) {
 					var card = lib.config.addedpile[mode][i];
 					var cfgnode = ui.create.div(".config.toggle.cardpilecfg");
 					cfgnode._info = card;
-					cfgnode.innerHTML = get.translation(card[2]) + " " + get.translation(card[0]) + card[1];
+					cfgnode.innerHTML =
+						(card[2] === "sha" && card[3] ? get.translation(card[3]) : "") +
+						get.translation(card[2]) +
+						" " +
+						get.translation(card[0]) +
+						card[1];
 					var cfgnodedelete = document.createElement("span");
 					cfgnodedelete.classList.add("cardpiledelete");
 					cfgnodedelete.innerHTML = "删除";

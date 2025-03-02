@@ -1,5 +1,6 @@
 const characters = {
 	noname: ["female", "key", 3, ["noname_zhuyuan", "noname_duocai"], ["name:null|无"]],
+	ns_shijian: ["female", "key", 4, ["nspianwu"]],
 
 	ns_huangchengyan: ["male", "shu", 3, ["nslongyue", "nszhenyin"]],
 	ns_sunchensunjun: ["male", "wu", 5, ["nsxianhai", "nsxingchu"], ["name:孙|綝-孙|峻"]],
@@ -34,7 +35,6 @@ const characters = {
 	// diy_weiyan:['male','shu',4,['diykuanggu']],
 	diy_zhenji: ["female", "wei", 3, ["diy_jiaoxia", "yiesheng"]],
 	// diy_menghuo:['male','shu',4,['huoshou','zaiqix']],
-	//re_huangyueying:['female','shu',3,['rejizhi','qicai']],
 
 	diy_liufu: ["male", "wei", 3, ["zhucheng", "duoqi"]],
 	diy_xizhenxihong: ["male", "shu", 4, ["fuchou", "jinyan"], ["name:习|珍-习|宏"]],
@@ -81,20 +81,21 @@ const characters = {
 	ns_chengpu: ["male", "wu", 4, ["decadelihuo", "decadechunlao"]],
 	ns_sundeng: ["male", "wu", 4, ["xinkuangbi"]],
 	ns_duji: ["male", "wei", 3, ["xinfu_andong", "xinyingshi"]],
-	old_majun: ["male", "wei", 3, ["xinfu_jingxie1", "xinfu_qiaosi"]],
+	old_majun: ["male", "wei", 3, ["xinfu_jingxie", "xinfu_qiaosi"]],
 	ns_mengyou: ["male", "qun", 4, ["nsmanzhi"]],
 
-	old_jiakui: ["male", "wei", 4, ["tongqu", "xinwanlan"]],
-	ol_guohuai: ["male", "wei", 3, ["rejingce"]],
+	diy_zhujun: ["male", "qun", "4/4", ["xinyangjie", "diy_juxiang", "houfeng"], ["character:sp_zhujun"]],
+	diy_liaohua: ["male", "shu", "4/4", ["redangxian", "diy_fuli"], ["character:xin_liaohua"]],
+	diy_zhangfei: ["male", "shu", "4/4", ["diy_paoxiao", "diy_tishen"], ["character:re_zhangfei"]],
+
 	junk_zhangrang: ["male", "qun", 3, ["junktaoluan"], ["sex:male_castrated"]],
 	old_bulianshi: ["female", "wu", 3, ["anxu", "zhuiyi"]],
 	ol_maliang: ["male", "shu", 3, ["zishu", "xinyingyuan"]],
 	junk_liubei: ["male", "shu", 4, ["junkrende", "jijiang"], ["zhu"]],
 	junk_huangyueying: ["female", "shu", 3, ["junkjizhi", "junkqicai"]],
 	junk_lidian: ["male", "wei", 3, ["xunxun", "junkwangxi"]],
-	junk_duanwei: ["male", "qun", 4, ["junklangmie"]],
+	junk_duanwei: ["male", "qun", 4, ["langmie"]],
 	junk_xuyou: ["male", "qun", 3, ["nzry_chenglve", "junkshicai", "nzry_cunmu"]],
-	junk_zhangjiao: ["male", "shen", 3, ["yizhao", "junksijun", "tianjie"], ["qun", "die:shen_zhangjiao"]],
 	junk_guanyu: ["male", "shu", 4, ["olsbfumeng", "olsbguidao"]],
 	junk_liuyan: ["male", "qun", "4/6", ["olpianan", "olyinji", "olkuisi"]],
 };

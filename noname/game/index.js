@@ -16,7 +16,7 @@ import { lib } from "../library/index.js";
 import { _status } from "../status/index.js";
 import { ui } from "../ui/index.js";
 import { gnc } from "../gnc/index.js";
-import { userAgent, Uninstantable, GeneratorFunction, AsyncFunction, delay, nonameInitialized } from "../util/index.js";
+import { isClass, userAgentLowerCase, Uninstantable, GeneratorFunction, AsyncFunction, delay, nonameInitialized } from "../util/index.js";
 
 import { DynamicStyle } from "./dynamic-style/index.js";
 import { GamePromises } from "./promises.js";
@@ -27,6 +27,7 @@ import { GameCompatible } from "./compatible.js";
 import { save } from "../util/config.js";
 
 export class Game extends GameCompatible {
+	documentZoom;
 	online = false;
 	onlineID = null;
 	onlineKey = null;
@@ -117,6 +118,141 @@ export class Game extends GameCompatible {
 			});
 		}
 	})();
+	/**
+	 * 交换任意两个元素的位置，附带过渡动画
+	 * @param {HTMLDivElement} e1
+	 * @param {HTMLDivElement} e2
+	 * @param {number} duration //动画完成的时间 ms
+	 * @param {'linear'|'ease-in-out'} timefun //动画过度的时间曲线,很多，这里只列举两个
+	 * @returns {Promise<void>}
+	 * @author Curpond
+	 */
+	$swapElement(e1, e2, duration = 400, timefun = "linear") {
+		return new Promise(resolve => {
+			let e1p = e1.parentElement;
+			let e2p = e2.parentElement;
+			let old1_overflow = e1p.style.overflow;
+			let old2_overflow = e2p.style.overflow;
+			/**@type {HTMLDivElement[]} */
+			let watchedElements = [...e1p.children, ...e2p.children].unique();
+
+			let e1n = e1.nextElementSibling;
+			let e2n = e2.nextElementSibling;
+
+			//first
+			let originalPosition = new Map(watchedElements.map(e => [e, e.getBoundingClientRect()]));
+
+			//last
+			e1p.insertBefore(e2, e1n);
+			e2p.insertBefore(e1, e2n);
+			let newPosition = new Map(watchedElements.map(e => [e, e.getBoundingClientRect()]));
+			let change = new Map(
+				watchedElements.map(e => {
+					return [
+						e,
+						{
+							dx: originalPosition.get(e).x - newPosition.get(e).x,
+							dy: originalPosition.get(e).y - newPosition.get(e).y,
+						},
+					];
+				})
+			);
+
+			//invert
+			e1p.style.overflow = "visible";
+			e2p.style.overflow = "visible";
+			change.forEach(({ dx, dy }, e) => {
+				e.style.transition = `none`;
+				e.style.transform = `translate(${dx / game.documentZoom}px, ${dy / game.documentZoom}px)`;
+			});
+			e1.offsetHeight;
+			//play
+			requestAnimationFrame(() => {
+				change.forEach(({ dx, dy }, e) => {
+					e.style.transition = `${duration}ms ${timefun}`;
+					e.style.removeProperty("transform");
+				});
+				let transitionEndHandler = () => {
+					change.forEach(({ dx, dy }, e) => e.removeEventListener("transitionend", transitionEndHandler));
+					e1p.style.overflow = old1_overflow;
+					e2p.style.overflow = old2_overflow;
+					resolve();
+				};
+				change.forEach(({ dx, dy }, e) => e.addEventListener("transitionend", transitionEndHandler, { once: true }));
+			});
+		});
+	}
+	/**
+	 * 元素去到某个父元素的某个位置，附带过度动画
+	 * @param {HTMLDivElement} element
+	 * @param {HTMLDivElement} Parent
+	 * @param {number|'first'|'last'|Node} position 新的父容器中元素去的位置
+	 * @param {number} duration 动画完成的时间 ms
+	 * @param {'linear'|'ease-in-out'} timefun 动画过度的时间曲线,很多，这里只列举两个
+	 * @returns {Promise<void>}
+	 * @author Curpond
+	 */
+	$elementGoto(element, Parent, position = "last", duration = 400, timefun = "linear") {
+		return new Promise(resolve => {
+			let e1p = element.parentElement;
+			let e2p = Parent;
+			let old1_overflow = e1p.style.overflow;
+			let old2_overflow = e2p.style.overflow;
+			/**@type {HTMLDivElement[]} */
+			let watchedElements = [...e1p.children, ...e2p.children].unique();
+
+			//first
+			let originalPosition = new Map(watchedElements.map(e => [e, e.getBoundingClientRect()]));
+			//last
+			if (position == "first") {
+				e2p.insertBefore(element, e2p.firstChild);
+			} else if (position == "last") {
+				e2p.appendChild(element);
+			} else if (typeof position == "number") {
+				e2p.insertBefore(element, e2p.children[position]);
+			} else if (e2p.contains(position)) {
+				e2p.insertBefore(element, position);
+			} else {
+				e2p.appendChild(element);
+			}
+			let newPosition = new Map(watchedElements.map(e => [e, e.getBoundingClientRect()]));
+			let change = new Map(
+				watchedElements.map(e => {
+					return [
+						e,
+						{
+							dx: originalPosition.get(e).x - newPosition.get(e).x,
+							dy: originalPosition.get(e).y - newPosition.get(e).y,
+						},
+					];
+				})
+			);
+
+			//invert
+			e2p.style.overflow = "visible";
+			e1p.style.overflow = "visible";
+			change.forEach(({ dx, dy }, e) => {
+				e.style.transition = `none`;
+				e.style.transform = `translate(${dx / game.documentZoom}px, ${dy / game.documentZoom}px)`;
+			});
+			element.offsetHeight;
+
+			//play
+			requestAnimationFrame(() => {
+				change.forEach(({ dx, dy }, e) => {
+					e.style.transition = `${duration}ms ${timefun}`;
+					e.style.removeProperty("transform");
+				});
+				let transitionEndHandler = () => {
+					change.forEach(({ dx, dy }, e) => e.removeEventListener("transitionend", transitionEndHandler));
+					e1p.style.overflow = old1_overflow;
+					e2p.style.overflow = old2_overflow;
+					resolve();
+				};
+				change.forEach(({ dx, dy }, e) => e.addEventListener("transitionend", transitionEndHandler, { once: true }));
+			});
+		});
+	}
 	//Stratagem
 	//谋攻
 	setStratagemBuffCost(cardName, cost) {
@@ -219,20 +355,17 @@ export class Game extends GameCompatible {
 		return id;
 	}
 	/**
-	 * @typedef {import("../library/hooks/interface.js").NonameHookType} NonameHookType
-	 */
-	/**
 	 * 通用的调用钩子函数
 	 *
 	 * @template {NonameHookType} HookType
-	 * @template {keyof HookType} Name
+	 * @template {keyof NonameHookType} Name
 	 * @param {Name} name
 	 * @param {Parameters<HookType[Name]>} args
 	 */
 	callHook(name, args) {
 		const callHook = () => {
 			for (const hook of lib.hooks[name]) {
-				if (hook != null && typeof hook == "function") {
+				if (typeof hook == "function") {
 					hook(...args);
 				}
 			}
@@ -700,25 +833,38 @@ export class Game extends GameCompatible {
 		if (type != "cards" && type != "card") return;
 		var next = game.createEvent("cardsDiscard");
 		// @ts-ignore
-		next.cards = type == "cards" ? cards.slice(0) : [cards];
+		if (type == "card") cards = [cards];
+		next.cards = cards
+			.slice(0)
+			.map(i => (i.cards ? i.cards : [i]))
+			.flat();
 		next.setContent("cardsDiscard");
 		next.getd = function (player, key, position) {
-			return this.cards.slice(0);
+			if (!player) return this.cards.slice(0);
+			if (!position) position = ui.ordering;
+			if (!key) key = "cards";
+			var cards = [],
+				event = this;
+			game.checkGlobalHistory("cardMove", function (evt) {
+				if (evt.name != "lose" || evt.position != position) return;
+				if (player && player != evt.player) return;
+				if (
+					(position == ui.ordering && evt.relatedEvent == event.getParent(2)) ||
+					event.getParent(2).childEvents.find(evtx => {
+						if (evtx.name == "loseAsync") return evtx.childEvents.find(evtx2 => evtx2 == evt);
+						return evt == evtx;
+					})
+				) {
+					cards.addArray(evt[key]);
+				}
+			});
+			return cards.filter(c => event.cards.includes(c));
 		};
 		return next;
 	}
 	/**
-	 * @overload
-	 * @returns { void }
-	 */
-	/**
-	 * @overload
-	 * @param { Card } cards
-	 * @returns { GameEventPromise }
-	 */
-	/**
-	 * @overload
-	 * @param {Card[]} cards
+	 * 将cards移动到处理区
+	 * @param { Card[] | Card } cards
 	 * @returns { GameEventPromise }
 	 */
 	cardsGotoOrdering(cards) {
@@ -921,25 +1067,26 @@ export class Game extends GameCompatible {
 	 */
 	checkFileList(updates, proceed) {
 		if (!Array.isArray(updates) || !updates.length) proceed();
-		let n = updates.length;
-		for (let i = 0; i < updates.length; i++) {
+		let n = updates.length,
+			list = updates.slice(0);
+		for (let i = 0; i < list.length; i++) {
 			if (lib.node && lib.node.fs) {
-				lib.node.fs.access(__dirname + "/" + updates[i], err => {
+				lib.node.fs.access(__dirname + "/" + list[i], err => {
 					if (!err) {
-						let stat = lib.node.fs.statSync(__dirname + "/" + updates[i]);
+						let stat = lib.node.fs.statSync(__dirname + "/" + list[i]);
 						// @ts-ignore
 						if (stat.size == 0) err = true;
 					}
 					n--;
-					if (!err) updates.remove(updates[i]);
+					if (!err) updates.remove(list[i]);
 					if (n == 0) proceed();
 				});
 			} else {
 				window.resolveLocalFileSystemURL(
-					nonameInitialized + updates[i],
+					nonameInitialized + list[i],
 					() => {
 						n--;
-						updates.remove(updates[i]);
+						updates.remove(list[i]);
 						if (n == 0) proceed();
 					},
 					() => {
@@ -1400,7 +1547,7 @@ export class Game extends GameCompatible {
 				: {
 						path: args.filter(arg => typeof arg === "string" || typeof arg === "number").join("/"),
 						onError: args.find(arg => typeof arg === "function"),
-					};
+				  };
 
 		const {
 			path = "",
@@ -1834,7 +1981,13 @@ export class Game extends GameCompatible {
 	async loadExtension(object) {
 		let noEval = false;
 		if (typeof object == "function") {
-			object = await (gnc.is.generatorFunc(object) ? gnc.of(object) : object)(lib, game, ui, get, ai, _status);
+			if (isClass(object)) {
+				const filters = await object.filter?.();
+				if (filters ?? true) object = await object.init?.() ?? new object();
+				else return;
+			} else {
+				object = await (gnc.is.generatorFunc(object) ? gnc.of(object) : object)(lib, game, ui, get, ai, _status);
+			}
 			noEval = true;
 		}
 		if (object.closeSyntaxCheck) {
@@ -1851,48 +2004,38 @@ export class Game extends GameCompatible {
 			objectPackage = object.package;
 		if (objectPackage) {
 			const author = Object.getOwnPropertyDescriptor(objectPackage, "author");
-			if (author)
-				Object.defineProperty(
-					(extensionMenu.author = {
-						get name() {
-							return `作者：${this.author}`;
-						},
-						clear: true,
-						nopointer: true,
-					}),
-					"author",
-					author
-				);
+			if (author) {
+				Object.defineProperty((extensionMenu.author = {
+					get name() {
+						return `作者：${this.author}`;
+					},
+					clear: true,
+					nopointer: true,
+				}), "author", author);
+			}
 			const intro = Object.getOwnPropertyDescriptor(objectPackage, "intro");
-			if (intro)
-				Object.defineProperty(
-					(extensionMenu.intro = {
-						clear: true,
-						nopointer: true,
-					}),
-					"name",
-					intro
-				);
+			if (intro) {
+				Object.defineProperty((extensionMenu.intro = {
+					clear: true,
+					nopointer: true,
+				}), "name", intro);
+			}
 		}
 		const objectConfig = object.config;
-		if (objectConfig)
-			Object.defineProperties(
-				extensionMenu,
-				Object.keys(objectConfig).reduce((propertyDescriptorMap, key) => {
-					propertyDescriptorMap[key] = Object.getOwnPropertyDescriptor(objectConfig, key);
-					return propertyDescriptorMap;
-				}, {})
-			);
+		if (objectConfig) {
+			Object.defineProperties(extensionMenu, Object.keys(objectConfig).reduce((propertyDescriptorMap, key) => {
+				propertyDescriptorMap[key] = Object.getOwnPropertyDescriptor(objectConfig, key);
+				return propertyDescriptorMap;
+			}, {}));
+		}
 		const help = object.help;
-		if (help)
-			Object.defineProperties(
-				lib.help,
-				Object.keys(help).reduce((propertyDescriptorMap, key) => {
-					propertyDescriptorMap[key] = Object.getOwnPropertyDescriptor(help, key);
-					return propertyDescriptorMap;
-				}, {})
-			);
-		if (object.editable !== false && lib.config.show_extensionmaker)
+		if (help) {
+			Object.defineProperties(lib.help, Object.keys(help).reduce((propertyDescriptorMap, key) => {
+				propertyDescriptorMap[key] = Object.getOwnPropertyDescriptor(help, key);
+				return propertyDescriptorMap;
+			}, {}));
+		}
+		if (object.editable !== false && lib.config.show_extensionmaker) {
 			extensionMenu.edit = {
 				name: "编辑此扩展",
 				clear: true,
@@ -1901,10 +2044,11 @@ export class Game extends GameCompatible {
 					else alert("无法编辑未启用的扩展，请启用此扩展并重启后重试");
 				},
 			};
+		}
 		extensionMenu.delete = {
 			name: "删除此扩展",
 			clear: true,
-			onclick: function () {
+			onclick () {
 				if (this.innerHTML != "<span>确认删除</span>") {
 					this.innerHTML = "<span>确认删除</span>";
 					new Promise(resolve => setTimeout(resolve, 1000)).then(() => (this.innerHTML = "<span>删除此扩展</span>"));
@@ -1945,18 +2089,23 @@ export class Game extends GameCompatible {
 			let extensionPack = lib.extensionPack[name];
 			if (objectPackage) {
 				extensionPack = lib.extensionPack[name] = objectPackage;
-				objectPackage.files = object.files || {};
+				objectPackage.files = object.files ?? {};
 				const extensionPackFiles = objectPackage.files;
 				if (!extensionPackFiles.character) extensionPackFiles.character = [];
 				if (!extensionPackFiles.card) extensionPackFiles.card = [];
 				if (!extensionPackFiles.skill) extensionPackFiles.skill = [];
+				if (!extensionPackFiles.audio) extensionPackFiles.audio = [];
 			} else extensionPack = lib.extensionPack[name] = {};
-			const content = object.content,
+			const arenaReady = object.arenaReady,
+				content = object.content,
+				prepare = object.prepare,
 				precontent = object.precontent;
 			extensionPack.code = {
-				content: content,
-				precontent: precontent,
-				help: help,
+				arenaReady,
+				content,
+				prepare,
+				precontent,
+				help,
 				config: objectConfig,
 			};
 			try {
@@ -1966,14 +2115,17 @@ export class Game extends GameCompatible {
 					await (gnc.is.generatorFunc(precontent) ? gnc.of(precontent) : precontent).call(object, config);
 					delete _status.extension;
 				}
+				if (prepare) {
+					lib.onprepare?.push(prepare);
+				}
 			} catch (e1) {
-				console.log(`加载《${name}》扩展的precontent时出现错误。`, e1);
+				console.error(`加载《${name}》扩展的precontent时出现错误。`, e1);
 				if (!lib.config.extension_alert) alert(`加载《${name}》扩展的precontent时出现错误。\n该错误本身可能并不影响扩展运行。您可以在“设置→通用→无视扩展报错”中关闭此弹窗。\n${decodeURI(e1.stack)}`);
 			}
 
-			if (content) lib.extensions.push([name, content, config, _status.evaluatingExtension, objectPackage || {}, object.connect]);
+			if (content) lib.extensions.push([name, content, config, _status.evaluatingExtension, objectPackage ?? {}, object.connect, arenaReady]);
 		} catch (e) {
-			console.log(e);
+			console.error(e);
 		}
 
 		return name;
@@ -2422,8 +2574,8 @@ export class Game extends GameCompatible {
 						if (onsuccess) onsuccess(list.length);
 						download();
 					},
-					function () {
-						if (onerror) onerror(list.length);
+					function (e) {
+						if (onerror) onerror(e);
 						download();
 					},
 					dev
@@ -3913,7 +4065,7 @@ export class Game extends GameCompatible {
 		delete _status.waitingToReload;
 	}
 	exit() {
-		var ua = userAgent;
+		var ua = userAgentLowerCase;
 		var ios = ua.includes("iphone") || ua.includes("ipad") || ua.includes("macintosh");
 		//electron
 		if (typeof window.process == "object" && typeof window.require == "function") {
@@ -3969,7 +4121,7 @@ export class Game extends GameCompatible {
 	}
 	reloadCurrent() {
 		let names = [game.me.name1 || game.me.name, game.me.name2];
-		if(game.me.name1 != game.me.name) names = [game.me.name];
+		if (game.me.name1 != game.me.name) names = [game.me.name];
 		game.saveConfig("continue_name", names);
 		game.saveConfig("mode", lib.config.mode);
 		localStorage.setItem(lib.configprefix + "directstart", true);
@@ -4110,8 +4262,9 @@ export class Game extends GameCompatible {
 			promptContainer.clicked = true;
 		});
 		let strnode = ui.create.div("", str || "", dialog);
-		let input = ui.create.node("input", ui.create.div(dialog));
+		let input = ui.create.node("textarea", ui.create.div(dialog));
 		input.value = str2;
+		input.setAttribute("cols", Math.max(str2.split("\n").length || 1, 10));
 		if (noinput) {
 			input.style.display = "none";
 		}
@@ -4489,6 +4642,330 @@ export class Game extends GameCompatible {
 		}
 		return node;
 	}
+	jianqiLineAnim = {
+		time: 1200,
+		position: "screen",
+		width: "256px",
+		height: "128px",
+		backgroundSize: "100% 100%",
+		opacity: 1,
+		show: "none",
+		fade: true,
+		pause: false,
+		rate_zhen: 18,
+		jump_zhen: false,
+		qianzhui: "",
+		liang: false,
+		isLine: true,
+		cycle: true,
+		style: {},
+		skills: [],
+		cards: [],
+		forbid: false,
+		image: "jianqilinexy",
+	};
+	zsPlayLineAnimation(name, node, fake, points) {
+		var animation = game.jianqiLineAnim;
+		animation["image"] = name;
+		if (lib.config.zsGuideTime) {
+			animation["time"] = parseInt(lib.config.zsGuideTime);
+		}
+		if (animation == undefined) return;
+		if (animation.time <= 100000) {
+			if (animation.pause != false && !_status.paused2 && !_status.nopause) {
+				_status.zhx_onAnimationPause = true;
+				game.pause2();
+			}
+			if (_status.zhx_onAnimation == undefined) _status.zhx_onAnimation = 0;
+			_status.zhx_onAnimation++;
+		}
+		var src;
+		if (animation.image != undefined) src = "image/pointer/" + animation.image + "?" + new Date().getTime();
+		var finish = function () {
+			var animationID;
+			var timeoutID;
+			var interval;
+			var div = ui.create.div();
+			if (fake == true) {
+				ui.window.appendChild(div);
+			} else {
+				if (node == undefined || node == false) {
+					ui.window.appendChild(div);
+				} else {
+					node.appendChild(div);
+				}
+			}
+			if (animation.style != undefined) {
+				for (var i in animation.style) {
+					if (i == "innerHTML") continue;
+					div.style[i] = animation.style[i];
+				}
+			}
+			var judgeStyle = function (style) {
+				if (animation.style == undefined) return false;
+				if (animation.style != undefined && animation.style[style] != undefined) return true;
+				return false;
+			};
+			if (judgeStyle("innerHTML")) div.innerHTML = animation.style.innerHTML;
+			if (judgeStyle("width") == false) div.style.width = animation.width;
+			if (judgeStyle("height") == false) div.style.height = animation.height;
+			if (judgeStyle("backgroundSize") == false && judgeStyle("background-size") == false) div.style.backgroundSize = animation.backgroundSize;
+			if (judgeStyle("opacity") == false) div.style.opacity = animation.opacity;
+			if (judgeStyle("zIndex") == false && judgeStyle("z-index") == false) div.style.zIndex = 1001;
+			if (judgeStyle("borderRadius") == false && judgeStyle("border-radius") == false) div.style.borderRadius = "5px";
+			if (judgeStyle("pointer-events") == false && judgeStyle("pointerEvents") == false) div.style["pointer-events"] = "none";
+			if (src != undefined) {
+				if (animation.image.indexOf(".") != -1) {
+					div.setBackgroundImage(src);
+				} else {
+					var type_frame1 = 0;
+					var type_frame = ".jpg";
+					var num_frame = 1;
+					type_frame = ".png";
+					num_frame = 8;
+					var folder_frame = lib.assetURL + "image/pointer/" + animation.image + "/";
+					var div1 = ui.create.div();
+					div1.style.height = "100%";
+					div1.style.width = "100%";
+					div1.style.top = "0px";
+					div1.style.left = "0px";
+					div1.style.opacity = "0.7";
+					div.appendChild(div1);
+					var canvas = document.createElement("canvas");
+					canvas.width = div1.offsetWidth;
+					canvas.height = div1.offsetHeight;
+					div1.appendChild(canvas);
+					var context = canvas.getContext("2d");
+					var start;
+					var imgs = [];
+					var imgs_num = 0;
+					for (var i = 0; i < num_frame; i++) {
+						var img = new Image();
+						img.src = folder_frame + (animation.qianzhui == undefined ? "" : animation.qianzhui) + (animation.liang == true ? (i < 10 ? "0" + i : i) : i) + type_frame;
+						if (i >= num_frame - 1) img.zhx_final = true;
+						img.onload = function () {
+							imgs.push(this);
+							if (this.zhx_final == true) start();
+						};
+						img.onerror = function () {
+							if (this.zhx_final == true) start();
+						};
+					}
+					start = function () {
+						var play = function () {
+							if (imgs_num >= imgs.length) return;
+							var img = imgs[imgs_num];
+							context.clearRect(0, 0, img.width, img.height);
+							context.drawImage(img, 0, 0, img.width, img.height, 0, 0, div1.offsetWidth, div1.offsetHeight);
+							imgs_num++;
+							if (animation.jump_zhen == true && imgs[imgs_num + 1] != undefined) imgs.remove(imgs_num + 1);
+							if (imgs_num >= imgs.length) {
+								if (animation.cycle == true) {
+									imgs_num = 0;
+								} else {
+									if (interval != undefined) clearInterval(interval);
+									if (timeoutID != undefined) clearTimeout(timeoutID);
+									if (animationID != undefined) cancelAnimationFrame(animationID);
+								}
+							}
+						};
+						interval = setInterval(play, animation.rate_zhen == undefined ? 45 : 1000 / animation.rate_zhen);
+					};
+				}
+			}
+			if (points == undefined) {
+				if (fake == true) {
+					div.style.top = top - div.offsetHeight / 2 + "px";
+					div.style.left = left - div.offsetWidth / 2 + "px";
+				} else {
+					if (judgeStyle("top") == false) div.style.top = "calc(50% - " + div.offsetHeight / 2 + "px)";
+					if (judgeStyle("left") == false) div.style.left = "calc(50% - " + div.offsetWidth / 2 + "px)";
+				}
+			} else {
+				div.style.top = points[0][1] - div.offsetHeight / 2 + "px";
+				div.style.left = points[0][0] + "px";
+			}
+			if (points != undefined) {
+				var timeS = (animation.fade == true ? animation.time - 450 : animation.time - 100) / 1000 / 2;
+				var getAngle = function (x1, y1, x2, y2, bool) {
+					var x = x1 - x2;
+					var y = y1 - y2;
+					var z = Math.sqrt(Math.pow(x, 2) + Math.pow(y, 2));
+					var cos = y / z;
+					var radina = Math.acos(cos);
+					var angle = 180 / (Math.PI / radina);
+					if (x2 > x1 && y2 === y1) angle = 0;
+					if (x2 > x1 && y2 < y1) angle = angle - 90;
+					if (x2 === x1 && y1 > y2) angle = -90;
+					if (x2 < x1 && y2 < y1) angle = 270 - angle;
+					if (x2 < x1 && y2 === y1) angle = 180;
+					if (x2 < x1 && y2 > y1) angle = 270 - angle;
+					if (x2 === x1 && y2 > y1) angle = 90;
+					if (x2 > x1 && y2 > y1) angle = angle - 90;
+					if (bool == true && angle > 90) angle -= 180;
+					return angle;
+				};
+				var p1 = points[0];
+				var p2 = points[1];
+				var x0 = p1[0];
+				var y0 = p1[1];
+				var x1 = p2[0];
+				var y1 = p2[1];
+				div.style.transition = "all 0s";
+				div.style.transform = "rotate(" + getAngle(x0, y0, x1, y1, true) + "deg)" + (x0 > x1 ? "" : " rotateY(180deg)");
+				div.style["transform-origin"] = "0 50%";
+				var div2 = ui.create.div();
+				div2.style.zIndex = 1000;
+				div2.style["pointer-events"] = "none";
+				div2.style.height = "20px";
+				div2.style.width = Math.pow(Math.pow(x1 - x0, 2) + Math.pow(y1 - y0, 2), 0.5) + 2 + "px";
+				div2.style.left = x0 + "px";
+				div2.style.top = y0 - 10 + "px";
+				div2.style.transform = "rotate(" + getAngle(x0, y0, x1, y1) + "deg) scaleX(0)";
+				div2.style["transform-origin"] = "0 50%";
+				div2.style.transition = "all " + (timeS * 4) / 3 + "s";
+				if (src != undefined && animation.image.indexOf(".") == -1) {
+					div2.style.backgroundSize = "100% 100%";
+					div2.style.opacity = "0.7";
+					div2.setBackgroundImage("image/pointer/" + animation.image + "/line.png");
+				} else {
+					div2.style.background = "#ffffff";
+				}
+				setTimeout(function () {
+					div.style.transition = "all " + (timeS * 4) / 3 + "s";
+					div.style.transform += " translateX(" + -(Math.pow(Math.pow(x1 - x0, 2) + Math.pow(y1 - y0, 2), 0.5) + 2) + "px)";
+					div2.style.transform = "rotate(" + getAngle(x0, y0, x1, y1) + "deg) scaleX(1)";
+				}, 50);
+				setTimeout(function () {
+					div2.style.transition = "all " + (timeS * 2) / 3 + "s";
+					div2.style.transform = "rotate(" + getAngle(x0, y0, x1, y1) + "deg) translateX(" + (Math.pow(Math.pow(x1 - x0, 2) + Math.pow(y1 - y0, 2), 0.5) + 2 - Math.pow(Math.pow(div.offsetHeight / 2, 2) + Math.pow(div.offsetWidth / 2, 2), 0.5)) + "px) scaleX(0.01)";
+				}, 50 + ((timeS * 4) / 3) * 1000);
+				node.appendChild(div2);
+			}
+			if (animation.time <= 100000) {
+				if (animation.fade == true) {
+					if (div2 != undefined) {
+						setTimeout(function () {
+							div2.hide();
+						}, animation.time - 350);
+						setTimeout(function () {
+							div.hide();
+						}, animation.time - 400);
+					} else {
+						setTimeout(function () {
+							div.hide();
+						}, animation.time - 350);
+					}
+				}
+				setTimeout(function () {
+					if (interval != undefined) clearInterval(interval);
+					if (timeoutID != undefined) clearTimeout(timeoutID);
+					if (animationID != undefined) cancelAnimationFrame(animationID);
+					if (fake == true) {
+						ui.window.removeChild(div);
+					} else {
+						if (node == undefined || node == false) {
+							ui.window.removeChild(div);
+						} else {
+							node.removeChild(div);
+						}
+					}
+					if (div2 != undefined) node.removeChild(div2);
+					_status.zhx_onAnimation--;
+					if (_status.zhx_onAnimationPause == true && _status.zhx_onAnimation == 0) {
+						delete _status.zhx_onAnimationPause;
+						game.resume2();
+					}
+				}, animation.time);
+			}
+		};
+		if (animation.delay != undefined) {
+			setTimeout(finish, animation.delay);
+		} else {
+			finish();
+		}
+	}
+	zsPlayLineAnimationByName(name, path) {
+		var from = [path[0], path[1]];
+		var to = [path[2], path[3]];
+		if (game.chess) {
+			game.zsPlayLineAnimation(name, ui.chess, false, [from, to]);
+		} else {
+			game.zsPlayLineAnimation(name, ui.arena, false, [from, to]);
+		}
+	}
+	zsJinlongLineXy(path) {
+		game.zsPlayLineAnimationByName("jinlonglinexy", path);
+	}
+	// 先攻指示线
+	zsXiangongLineXy(path) {
+		game.zsPlayLineAnimationByName("jianqilinexy", path);
+	}
+
+	// 竹杖指示线
+	zsZhuzhangLineXy(path) {
+		game.zsPlayLineAnimationByName("zhuzhanglinexy", path);
+	}
+
+	// 水墨指示线
+	zsMohuaLineXy(path) {
+		game.zsPlayLineAnimationByName("mohualinexy", path);
+	}
+
+	// 神剑指示线
+	zsShenjianLineXy(path) {
+		game.zsPlayLineAnimationByName("shenjianlinexy", path);
+	}
+
+	// 御剑指示线
+	zsYujianLineXy(path) {
+		game.zsPlayLineAnimationByName("yujianlinexy", path);
+	}
+
+	// 暗黑指示线
+	zsAnheiLineXy(path) {
+		game.zsPlayLineAnimationByName("anheilinexy", path);
+	}
+
+	// 魔爪指示线
+	zsMozhuaLineXy(path) {
+		game.zsPlayLineAnimationByName("mozhualinexy", path);
+	}
+
+	// 剑锋指示线
+	zsJianfengLineXy(path) {
+		game.zsPlayLineAnimationByName("jianfenglinexy", path);
+	}
+
+	// 金箭指示线
+	zsJinjianLineXy(path) {
+		game.zsPlayLineAnimationByName("jinjianlinexy", path);
+	}
+
+	// 金龙指示线
+	zsJinlongLineXy(path) {
+		game.zsPlayLineAnimationByName("jinlonglinexy", path);
+	}
+
+	// 落英指示线
+	zsLuoyingLineXy(path) {
+		game.zsPlayLineAnimationByName("luoyinglinexy", path);
+	}
+
+	// 星蝶指示线
+	zsXingdieLineXy(path) {
+		game.zsPlayLineAnimationByName("xingdielinexy", path);
+	}
+
+	// 月仙指示线
+	zsYuexianLineXy(path) {
+		game.zsPlayLineAnimationByName("yuexianlinexy", path);
+	}
+
+	// 蛇杖指示线
+	zsShezhangLineXy(path) {
+		game.zsPlayLineAnimationByName("shezhanglinexy", path);
+	}
 	/**
 	 * @param { [number, number | {opacity:any, color:any, dashed:any, duration:any} | string, number, number] } path
 	 */
@@ -4605,7 +5082,7 @@ export class Game extends GameCompatible {
 			character = [information.sex, information.group, information.hp, information.skills || [], [_status.evaluatingExtension ? `db:extension-${extensionName}:${name}.jpg` : `ext:${extensionName}/${name}.jpg`, `die:ext:${extensionName}/${name}.mp3`]];
 		if (information.tags) character[4] = character[4].concat(information.tags);
 		lib.character[name] = character;
-		const packName = `mode_extension_${extensionName}`;
+		const packName = extensionName;
 		if (!lib.characterPack[packName]) lib.characterPack[packName] = {};
 		lib.translate[name] = information.translate;
 		lib.characterPack[packName][name] = character;
@@ -4668,7 +5145,7 @@ export class Game extends GameCompatible {
 				}
 			}
 		}
-		let packname = "mode_extension_" + packagename;
+		let packname = packagename;
 		lib.characterPack[packname] = pack.character;
 		lib.translate[packname + "_character_config"] = packagename;
 		if (gzFlag) lib.characterGuozhanFilter.add(packname);
@@ -4712,7 +5189,7 @@ export class Game extends GameCompatible {
 				lib.card.list.push([suits[Math.floor(Math.random() * suits.length)], Math.ceil(Math.random() * 13), name]);
 			}
 		}
-		let packname = "mode_extension_" + extname;
+		let packname = extname;
 		if (!lib.cardPack[packname]) {
 			lib.cardPack[packname] = [];
 			lib.translate[packname + "_card_config"] = extname;
@@ -4726,7 +5203,7 @@ export class Game extends GameCompatible {
 	addCardPack(pack, packagename) {
 		let extname = _status.extension || "扩展";
 		packagename = packagename || extname;
-		let packname = "mode_extension_" + packagename;
+		let packname = packagename;
 		lib.cardPack[packname] = [];
 		lib.cardPackInfo[packname] = pack;
 		lib.translate[packname + "_card_config"] = packagename;
@@ -4987,15 +5464,11 @@ export class Game extends GameCompatible {
 		game.saveConfig("recentCharacter", list, true);
 	}
 	/**
-	 * @overload
-	 * @returns { Card }
-	 */
-	/**
-	 * @overload
-	 * @param { Card | string } name
+	 * @param { Card | VCard | object | string } name
 	 * @param { string } [suit]
 	 * @param { number | string } [number]
 	 * @param { string } [nature]
+	 * @returns { Card }
 	 */
 	createCard(name, suit, number, nature) {
 		if (typeof name == "object") {
@@ -5019,14 +5492,14 @@ export class Game extends GameCompatible {
 			nature = lib.card[name].cardnature;
 		}
 		if (typeof suit != "string") {
-			suit = ["heart", "diamond", "club", "spade"].randomGet();
+			suit = "none";
 		} else if (suit == "black") {
 			suit = Math.random() < 0.5 ? "club" : "spade";
 		} else if (suit == "red") {
 			suit = Math.random() < 0.5 ? "diamond" : "heart";
 		}
 		if (typeof number != "number" && typeof number != "string") {
-			number = Math.ceil(Math.random() * 13);
+			number = 0;
 		}
 		let card;
 		if (noclick) {
@@ -5851,7 +6324,7 @@ export class Game extends GameCompatible {
 
 		if (event.isMine() && game.chess && get.config("show_distance") && game.me) {
 			const players = game.players.slice();
-			if (event.deadTarget) players.addArray(game.dead);
+			if (event.deadTarget || (event.skill && get.info(event.skill)?.deadTarget)) players.addArray(game.dead);
 			players.forEach(player => {
 				if (player === game.me) return player.node.action.hide();
 				player.node.action.show();
@@ -5885,8 +6358,7 @@ export class Game extends GameCompatible {
 	uncheck(...args) {
 		if (args.length === 0) args = ["button", "card", "target"];
 		const event = _status.event;
-		const players = game.players.slice();
-		if (_status.event.deadTarget) players.addArray(game.dead);
+		const players = game.players.slice().concat(game.dead);
 
 		game.callHook("uncheckBegin", [event, args]);
 
@@ -6145,18 +6617,23 @@ export class Game extends GameCompatible {
 			const exports = await import(`../../mode/${name}.js`);
 			// esm模式
 			if (Object.keys(exports).length > 0) {
-				if (typeof exports.default !== 'function') {
+				if (typeof exports.default !== "function") {
 					throw new Error(`导入的模式[${name}]格式不正确！`);
 				}
-				game.import('mode', exports.default);
+				game.import("mode", exports.default);
 			}
 			// 普通模式
 			else {
 				await new Promise((resolve, reject) => {
-					let script = lib.init.js(`${lib.assetURL}mode`, name, () => {
-						script?.remove();
-						resolve(null);
-					}, e => reject(e.error));
+					let script = lib.init.js(
+						`${lib.assetURL}mode`,
+						name,
+						() => {
+							script?.remove();
+							resolve(null);
+						},
+						e => reject(e.error)
+					);
 				});
 			}
 			await Promise.allSettled(_status.importing.mode);
@@ -6733,7 +7210,7 @@ export class Game extends GameCompatible {
 			for (let i = 0; i < event.config.size; i++) {
 				ui.window.appendChild(event.nodes[i]);
 			}
-			("step 1");
+			"step 1";
 			let rand1 = event.config.first;
 			if (rand1 == "rand") {
 				rand1 = Math.random() < 0.5;
@@ -6770,7 +7247,7 @@ export class Game extends GameCompatible {
 			}
 			game.delay();
 			lib.init.onfree();
-			("step 2");
+			"step 2";
 			if (event.checkredo()) return;
 			if (event._skiprest) return;
 			if (event.side < 2) {
@@ -6786,7 +7263,7 @@ export class Game extends GameCompatible {
 				event.aiMove();
 				game.delay();
 			}
-			("step 3");
+			"step 3";
 			if (typeof event.fast == "number" && get.time() - event.fast <= 1000) {
 				event.fast = true;
 			} else {
@@ -6821,7 +7298,7 @@ export class Game extends GameCompatible {
 					game.delay();
 				}
 			}
-			("step 4");
+			"step 4";
 			if (event.checkredo()) return;
 			if (event.skipnode) event.skipnode.delete();
 			if (event.replacenode) event.replacenode.delete();
@@ -6840,7 +7317,7 @@ export class Game extends GameCompatible {
 				}
 			}
 			game.delay();
-			("step 5");
+			"step 5";
 			event.prompt("选择" + get.cnNumber(event.config.num) + "名出场武将");
 			event.enemylist = [];
 			for (let i = 0; i < event.avatars.length; i++) {
@@ -6870,7 +7347,7 @@ export class Game extends GameCompatible {
 				event.nodes[i].hide();
 			}
 			game.pause();
-			("step 6");
+			"step 6";
 			event.promptbar.delete();
 			if (ui.cardPileButton) ui.cardPileButton.style.display = "";
 			lib.onresize.remove(event.resize);
@@ -7009,7 +7486,7 @@ export class Game extends GameCompatible {
 				const iValue = `${i}_${value}`;
 				lib.skill[iValue] = info.subSkill[value];
 				lib.skill[iValue].sub = true;
-				if (!info.subSkill[value].sourceSkill) lib.skill[iValue].sourceSkill = i;
+				if (info.subSkill[value].sourceSkill !== false) lib.skill[iValue].sourceSkill = i;
 				if (info.subSkill[value].name) lib.translate[iValue] = info.subSkill[value].name;
 				else lib.translate[iValue] = lib.translate[iValue] || lib.translate[i];
 				if (info.subSkill[value].description) lib.translate[`${iValue}_info`] = info.subSkill[value].description;
@@ -7143,9 +7620,7 @@ export class Game extends GameCompatible {
 		});
 		Object.keys(lib.skill).forEach(value => game.finishSkill(value));
 	}
-	/**
-	 * 这玩意至少19种重载了吧
-	 */
+	/**@type {CheckMod} */
 	checkMod() {
 		const argumentArray = Array.from(arguments),
 			name = argumentArray[argumentArray.length - 2];
@@ -7580,7 +8055,7 @@ export class Game extends GameCompatible {
 							game.reload2();
 							resolve(result);
 						};
-					}
+				  }
 				: (resolve, reject) => {
 						lib.status.reload++;
 						const idbRequest = lib.db.transaction([storeName], "readwrite").objectStore(storeName).openCursor(),
@@ -7610,7 +8085,7 @@ export class Game extends GameCompatible {
 							game.reload2();
 							resolve(object);
 						};
-					}
+				  }
 		);
 	}
 	/**
@@ -7664,7 +8139,7 @@ export class Game extends GameCompatible {
 						game.reload2();
 						resolve(event);
 					};
-				})
+			  })
 			: game.getDB(storeName).then(object => {
 					const keys = Object.keys(object);
 					lib.status.reload += keys.length;
@@ -7685,7 +8160,7 @@ export class Game extends GameCompatible {
 								})
 						)
 					);
-				});
+			  });
 	}
 	/**
 	 * @param { string } key
@@ -7910,6 +8385,7 @@ export class Game extends GameCompatible {
 			if (parseInt(value.dataset.position) >= position) value.dataset.position = parseInt(value.dataset.position) + 1;
 		});
 		const player = ui.create.player(ui.arena).addTempClass("start");
+		player.getId();
 		if (character) player.init(character, character2);
 		game.players.push(player);
 		player.dataset.position = position;

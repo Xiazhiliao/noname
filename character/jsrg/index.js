@@ -6,7 +6,6 @@ import skills from "./skill.js";
 import translates from "./translate.js";
 import characterIntros from "./intro.js";
 import characterFilters from "./characterFilter.js";
-import characterReplaces from "./characterReplace.js";
 import dynamicTranslates from "./dynamicTranslate.js";
 import voices from "./voices.js";
 import { characterSort, characterSortTranslate } from "./sort.js";
@@ -19,11 +18,13 @@ game.import("character", function () {
 		characterSort: {
 			jsrg: characterSort,
 		},
+		characterSubstitute: {
+			jsrg_simazhao: [["jin_jsrg_simazhao", []]],
+		},
 		characterFilter: { ...characterFilters },
 		characterTitle: {},
 		dynamicTranslate: { ...dynamicTranslates },
 		characterIntro: { ...characterIntros },
-		characterReplace: { ...characterReplaces },
 		card: { ...cards },
 		skill: { ...skills },
 		translate: { ...translates, ...voices, ...characterSortTranslate },

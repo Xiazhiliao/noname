@@ -13,11 +13,11 @@ game.import("card", function () {
 				type: "trick",
 				enable: true,
 				audio: true,
-				filterTarget: function (card, player, target) {
+				filterTarget(card, player, target) {
 					return target != player && target.countCards("hej") > 0;
 				},
 				defaultYingbianEffect: "add",
-				content: function () {
+				content() {
 					var dist = get.distance(player, target);
 					if (dist > 1 || card.yingbian_all)
 						player
@@ -31,11 +31,11 @@ game.import("card", function () {
 							.set("ai", lib.card.shunshou.ai.button);
 				},
 				fullskin: true,
-				postAi: function (targets) {
+				postAi(targets) {
 					return targets.length == 1 && targets[0].countCards("j");
 				},
 				ai: {
-					wuxie: function (target, card, player, viewer, status) {
+					wuxie(target, card, player, viewer, status) {
 						if (get.attitude(viewer, player._trueMe || player) > 0) return 0;
 						if (
 							!card.yingbian_all &&
@@ -56,7 +56,7 @@ game.import("card", function () {
 						)
 							return 0;
 					},
-					yingbian: function (card, player, targets, viewer) {
+					yingbian(card, player, targets, viewer) {
 						if (get.attitude(viewer, player) <= 0) return 0;
 						var base = 0;
 						if (get.cardtag(card, "yingbian_all")) {
@@ -126,7 +126,7 @@ game.import("card", function () {
 						},
 					},
 					result: {
-						target: function (player, target) {
+						target(player, target) {
 							var discard = get.distance(player, target) > 1;
 							if (get.attitude(player, target) <= 0)
 								return target.countCards("he", function (card) {
@@ -145,7 +145,7 @@ game.import("card", function () {
 							})) return 3;
 							return -1.5;
 						},
-						player: function (player, target) {
+						player(player, target) {
 							if (get.distance(player, target) > 1) return 0;
 							if (
 								get.attitude(player, target) < 0 &&
@@ -180,13 +180,14 @@ game.import("card", function () {
 				enable: true,
 				selectTarget: -1,
 				toself: true,
-				filterTarget: function (card, player, target) {
+				filterTarget(card, player, target) {
 					return target == player;
 				},
 				modTarget: true,
-				content: function () {
-					target.chooseToGuanxing(2);
-					target.draw(2);
+				async content(event, trigger, player) {
+					const target = event.target;
+					await target.chooseToGuanxing(2);
+					await target.draw(2);
 				},
 				ai: {
 					basic: {
@@ -207,11 +208,11 @@ game.import("card", function () {
 				enable: true,
 				type: "trick",
 				fullskin: true,
-				filterTarget: function (card, player, target) {
+				filterTarget(card, player, target) {
 					return target != player && target.countCards("h") > 0;
 				},
 				defaultYingbianEffect: "add",
-				content: function () {
+				content() {
 					"step 0";
 					if (player.isDead() || !target.countCards("h")) {
 						event.finish();
@@ -230,7 +231,7 @@ game.import("card", function () {
 						useful: 2,
 						value: 6,
 					},
-					yingbian: function (card, player, targets, viewer) {
+					yingbian(card, player, targets, viewer) {
 						if (get.attitude(viewer, player) <= 0) return 0;
 						if (
 							game.hasPlayer(function (current) {
@@ -331,16 +332,16 @@ game.import("card", function () {
 				subtype: "equip5",
 				cardcolor: "club",
 				skills: ["tianjitu_skill"],
-				onLose: function () {
+				onLose() {
 					player.addTempSkill("tianjitu_skill_lose");
 				},
 				loseDelay: false,
 				ai: {
-					value: function (card, player) {
+					value(card, player) {
 						if (player.countCards("h") > 3 || get.position(card) != "e") return 0.5;
 						return (player.countCards("h") - 4) * 5;
 					},
-					equipValue: function (card, player) {
+					equipValue(card, player) {
 						if (player.countCards("h") > 3 || get.position(card) != "e") return 0.5;
 						return (player.countCards("h") - 4) * 5;
 					},
@@ -366,11 +367,11 @@ game.import("card", function () {
 		skill: {
 			suijiyingbian_skill: {
 				mod: {
-					cardname: function (card, player) {
+					cardname(card, player) {
 						if (card.name == "suijiyingbian" && player.storage.suijiyingbian)
 							return player.storage.suijiyingbian;
 					},
-					cardnature: function (card, player) {
+					cardnature(card, player) {
 						if (card.name == "suijiyingbian" && player.storage.suijiyingbian_nature)
 							return player.storage.suijiyingbian_nature;
 					},
@@ -381,12 +382,12 @@ game.import("card", function () {
 				},
 				silent: true,
 				firstDo: true,
-				filter: function (event, player, name) {
+				filter(event, player, name) {
 					if (name == "phaseBeginStart") return true;
 					var type = get.type(event.card);
 					return type == "basic" || type == "trick";
 				},
-				content: function () {
+				content() {
 					if (event.triggername == "phaseBeginStart") {
 						delete player.storage.suijiyingbian;
 						delete player.storage.suijiyingbian_nature;
@@ -399,7 +400,7 @@ game.import("card", function () {
 			wuxinghelingshan_skill: {
 				equipSkill: true,
 				trigger: { player: "useCard1" },
-				filter: function (event, player) {
+				filter(event, player) {
 					return (
 						event.card.name == "sha" &&
 						lib.linked.some((n) => n != "kami" && game.hasNature(event.card, n))
@@ -407,7 +408,7 @@ game.import("card", function () {
 				},
 				audio: true,
 				direct: true,
-				content: function () {
+				content() {
 					"step 0";
 					var list = lib.linked.slice(0);
 					list.remove("kami");
@@ -431,11 +432,11 @@ game.import("card", function () {
 				forced: true,
 				equipSkill: true,
 				audio: true,
-				filter: function (event, player) {
+				filter(event, player) {
 					return event.card.name == "sha" && !event.target.isLinked(); //||event.target.countCards('h'));
 				},
 				logTarget: "target",
-				content: function () {
+				content() {
 					var target = trigger.target;
 					if (!target.isLinked()) target.link();
 					//else player.viewHandcards(target);
@@ -446,7 +447,7 @@ game.import("card", function () {
 				trigger: { target: "useCardToTargeted" },
 				forced: true,
 				audio: true,
-				filter: function (event, player) {
+				filter(event, player) {
 					if (event.targets.length < 2) return false;
 					if (event.card.name != "sha") {
 						var type = get.type(event.card);
@@ -464,7 +465,7 @@ game.import("card", function () {
 						return false;
 					return true;
 				},
-				content: function () {
+				content() {
 					trigger.excluded.add(player);
 				},
 				global: "heiguangkai_ai",
@@ -524,7 +525,7 @@ game.import("card", function () {
 							});
 							return lostCards.length;
 						},
-						content: function () {
+						content() {
 							player.drawTo(5);
 						},
 					},
@@ -535,10 +536,10 @@ game.import("card", function () {
 				audio: true,
 				trigger: { player: "phaseUseEnd" },
 				direct: true,
-				filter: function (event, player) {
+				filter(event, player) {
 					return player.countCards("h") > 0;
 				},
-				content: function () {
+				content() {
 					"step 0";
 					player
 						.chooseCard("h", "是否发动【太公阴符】重铸一张手牌？", lib.filter.cardRecastable)
@@ -562,7 +563,7 @@ game.import("card", function () {
 				//	});
 				//},
 				direct: true,
-				content: function () {
+				content() {
 					"step 0";
 					player
 						.chooseTarget(
@@ -686,7 +687,7 @@ game.import("card", function () {
 				forced: true,
 				popup: false,
 				charlotte: true,
-				filter: function (event, player) {
+				filter(event, player) {
 					if (event.yingbian_removeTarget && event.targets && event.targets.length > 1) return true;
 					if (!event.yingbian_addTarget) return false;
 					var info = get.info(event.card);
@@ -706,7 +707,7 @@ game.import("card", function () {
 					}
 					return false;
 				},
-				content: function () {
+				content() {
 					"step 0";
 					if (trigger.yingbian_addTarget)
 						player
